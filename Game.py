@@ -106,10 +106,19 @@ class MyGame():
         my_message = "FOOD SCORE: " + str( self.food.score )
         self.draw_message(image, (0,20),  my_message, self.food.color)
 
+    def draw_game_state(self, image):
+        if self.game_state == self.STATE_ENEMY_WIN: my_color = self.enemy.color
+        elif self.game_state == self.STATE_FOOD_WIN: my_color = self.food.color
+        elif self.game_state == self.STATE_PLAYER_WIN: my_color = self.player.color
+        else: my_color =  (255, 255, 255)
+        self.draw_message(image, (220, 0), self.game_state, my_color)
+
     def render(self, W_WIDTH=300, W_HEIGHT=300, final_frame=False):
         img = Image.fromarray(self.environment, "RGB")
         img = img.resize((W_WIDTH, W_HEIGHT))
         self.draw_score(img)
+        if final_frame: 
+            self.draw_game_state(img)
         img = np.array(img)
         cv2.imshow("Catch A Fly", img)
         return img

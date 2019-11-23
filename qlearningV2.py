@@ -59,6 +59,7 @@ else:
 print("Runnin in the 90s.....")
 episode_rewards = []
 episode_reward = 0
+game_draw_counter = 0
 game = Game.MyGame(is_training = False)
 try:
     for episode in range(0,HM_EPISODES+1):
@@ -105,15 +106,17 @@ try:
             episode_reward += reward  
             
             if show:
-                img = game.render(W_WIDTH = W_WIDTH, W_HEIGHT = W_HEIGHT)
-                img_array.append(img)
+                if step == STEP_COUNT:
+                    game_draw_counter += 1
                 if game_ended or step == STEP_COUNT:
                     # & 0xFF to get rid of extrabits added by numlock on
-                    if (cv2.waitKey(1000) & 0xFF) == ord("q"):
-                        break
+                    img = game.render(W_WIDTH = W_WIDTH, W_HEIGHT = W_HEIGHT, final_frame= True)
+                    for i in range(25): img_array.append(img)
+                    cv2.waitKey(50)
                 else:
-                    if (cv2.waitKey(10) & 0xFF) == ord("q"):
-                            break
+                    img = game.render(W_WIDTH = W_WIDTH, W_HEIGHT = W_HEIGHT)
+                    img_array.append(img)
+                    cv2.waitKey(10)
             
             if game_ended or step == STEP_COUNT:
                 break
@@ -132,6 +135,17 @@ finally:
     with open("Models\\qtable-%s.pickle"%(int(time.time())), "wb") as f:
         pickle.dump(q_table, f)
 
+# hist = {"player": game.player.score, "enemy": game.enemy.score, "food": game.food.score, "draw": game_draw_counter}
+bar_labels = "player", "enemy", "food", "draw"
+x = np.arange(1, 5)
+plt.bar(1, (0, game.player.score), color = 'b', width= 0.5, label = "PLAYER")
+plt.bar(2, (0, game.enemy.score), color = 'r', width= 0.5, label = "ENEMY")
+plt.bar(3, (0, game.food.score), color = 'g', width= 0.5, label = "FOOD")
+plt.bar(4, (0, game_draw_counter), color = 'w', width= 0.5, label = "DRAW")
+plt.title("Blob Scores", fontsize = 20)
+plt.xticks(x, bar_labels)
+plt.legend(fontsize = 15, loc = (0.8, 0.8))
+plt.show()
 # # smooths the curve a bit
 # moving_avg = np.convolve(episode_rewards, np.ones(SHOW_EVERY) / SHOW_EVERY, mode ="valid")
 
