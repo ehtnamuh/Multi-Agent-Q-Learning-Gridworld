@@ -5,6 +5,7 @@ from cv2 import cv2
 from typing import overload
 import Blob
 
+# RED CHASES BLUE; BLUE CHASES GREEN; GREEN CHASES RED
 class MyGame():
     # PLAYER COLLISION STATES
     HIT_ENEMY = 'hit_enemy'
@@ -37,7 +38,6 @@ class MyGame():
     STATE_PLAYER_WIN = "PLAYER_WIN"
     STATE_FOOD_WIN = "FOOD_WIN"
     STATE_DRAW = "DRAW"
-    
     
     def __init__(self, level='level1', SIZE=10, is_training = False):
         if (SIZE < 10):

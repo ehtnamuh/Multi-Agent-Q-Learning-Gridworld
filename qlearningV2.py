@@ -10,8 +10,8 @@ import Game
 style.use("ggplot")
 
 SIZE = 10
-HM_EPISODES = 50
-STEP_COUNT = 100
+HM_EPISODES = 100
+STEP_COUNT = 50
 SHOW_EVERY = 1
 SECTIONS = 5
 SECTION_SIZE = int(HM_EPISODES/SECTIONS)
@@ -112,11 +112,11 @@ try:
                     # & 0xFF to get rid of extrabits added by numlock on
                     img = game.render(W_WIDTH = W_WIDTH, W_HEIGHT = W_HEIGHT, final_frame= True)
                     for i in range(25): img_array.append(img)
-                    cv2.waitKey(50)
+                    cv2.waitKey(1000)
                 else:
                     img = game.render(W_WIDTH = W_WIDTH, W_HEIGHT = W_HEIGHT)
                     img_array.append(img)
-                    cv2.waitKey(10)
+                    cv2.waitKey(500)
             
             if game_ended or step == STEP_COUNT:
                 break
@@ -135,7 +135,7 @@ finally:
     with open("Models\\qtable-%s.pickle"%(int(time.time())), "wb") as f:
         pickle.dump(q_table, f)
 
-# hist = {"player": game.player.score, "enemy": game.enemy.score, "food": game.food.score, "draw": game_draw_counter}
+
 bar_labels = "player", "enemy", "food", "draw"
 x = np.arange(1, 5)
 plt.bar(1, (0, game.player.score), color = 'b', width= 0.5, label = "PLAYER")
@@ -145,6 +145,7 @@ plt.bar(4, (0, game_draw_counter), color = 'w', width= 0.5, label = "DRAW")
 plt.title("Blob Scores", fontsize = 20)
 plt.xticks(x, bar_labels)
 plt.legend(fontsize = 15, loc = (0.8, 0.8))
+plt.ylabel("SCORE")
 plt.show()
 # # smooths the curve a bit
 # moving_avg = np.convolve(episode_rewards, np.ones(SHOW_EVERY) / SHOW_EVERY, mode ="valid")
