@@ -4,15 +4,17 @@ from PIL import ImageDraw
 from cv2 import cv2
 from typing import overload
 import Blob
+import MyConstants
 
-# RED CHASES BLUE; BLUE CHASES GREEN; GREEN CHASES RED
-class MyGame():
-    # PLAYER COLLISION STATES
+# PLAYER COLLISION STATES
+class States():
     HIT_ENEMY = 'hit_enemy'
     HIT_OBSTACLE = 'hit_obstacle'
     HIT_FOOD = 'hit_food'
     HIT_TRAP = 'hit_trap'
 
+# RED CHASES BLUE; BLUE CHASES GREEN; GREEN CHASES RED
+class MyGame():
     # Object Color data
     PLAYER_N = 1
     FOOD_N = 2
@@ -31,6 +33,9 @@ class MyGame():
                     (6, 3), (6, 5), (6, 6), (6, 7),
                     (4, 3), (4, 8)],
         'traps': [(4, 5), (8, 1)]
+    }, 'level2': {
+        'obstacles': [ (1,2), (3,2), (1,6), (2,5), (3,6), (5,4), (6,5), (7,4), (9,4), (9,7)],
+        'traps': [(2, 9), (7, 1)]
     }}
 
     # Game States
@@ -43,13 +48,17 @@ class MyGame():
         if (SIZE < 10):
             SIZE = 10
         self.SIZE = SIZE
+        self.game_end_condition = False
+        self.episode_number = 0
+        self.trap_counter = 0
         self.environment = []
         self.is_training = is_training
         self.game_state = self.STATE_DRAW
         # TODO: READ LEVELS FORM FILE LATER
         # self.levels = some file read operation
         self.load_level(level)
-        self.player, self.enemy, self.food = None, None, None
+        self.Blobs = { MyConstants.PLAYER: None, MyConstants.ENEMY: None, MyConstants.FOOD: None }
+        # self.player, self.enemy, self.food = None, None, None
         self.create_blobs()
 
     def load_level(self, level='level1'):
@@ -63,31 +72,42 @@ class MyGame():
             self.environment[obstacle[1]][obstacle[0]] = self.d[self.OBSTACLE_N]
         for trap in self.trap_list:
             self.environment[trap[1]][trap[0]] = self.d[self.TRAP_N]
-        self.environment[self.food.y][self.food.x] = self.food.color
-        self.environment[self.player.y][self.player.x] = self.player.color
-        self.environment[self.enemy.y][self.enemy.x] = self.enemy.color
+        
+        if (self.Blobs[MyConstants.FOOD].is_active): 
+            self.environment[self.Blobs[MyConstants.FOOD].y][self.Blobs[MyConstants.FOOD].x] = self.Blobs[MyConstants.FOOD].color
+        
+        if (self.Blobs[MyConstants.PLAYER].is_active): self.environment[self.Blobs[MyConstants.PLAYER].y][self.Blobs[MyConstants.PLAYER].x] = self.Blobs[MyConstants.PLAYER].color
+        
+        if (self.Blobs[MyConstants.ENEMY].is_active): self.environment[self.Blobs[MyConstants.ENEMY].y][self.Blobs[MyConstants.ENEMY].x] = self.Blobs[MyConstants.ENEMY].color
 
     def reset_environment(self):
         self.environment = []
+        self.episode_number += 1
+        self.trap_counter = 0
+        self.game_state = self.STATE_DRAW
         self.create_blobs()
+        self.game_end_condition = False
         self.update_environment()
 
     def create_blobs(self):
-        if (self.player == None): self.player = Blob.Blob(self.d[self.PLAYER_N], self.SIZE)
-        if (self.enemy == None): self.enemy = Blob.Blob(self.d[self.ENEMY_N] ,self.SIZE)
-        if (self.food == None): self.food = Blob.Blob(self.d[self.FOOD_N], self.SIZE)
-        self.player.randomize_pos()
-        self.enemy.randomize_pos()
-        self.food.randomize_pos()
-        while (self.player.get_pos() in self.obstacle_list or
-                self.player.get_pos() in self.trap_list):
-            self.player.randomize_pos()
-        while (self.enemy.get_pos() in self.obstacle_list or
-                self.enemy.get_pos() in self.trap_list):
-            self.enemy.randomize_pos()
-        while (self.food.get_pos() in self.obstacle_list or
-                self.food.get_pos() in self.trap_list):
-            self.food.randomize_pos()
+        if (self.Blobs[MyConstants.PLAYER] == None): self.Blobs[MyConstants.PLAYER] = Blob.Blob(self.d[self.PLAYER_N], self.SIZE)
+        if (self.Blobs[MyConstants.ENEMY] == None): self.Blobs[MyConstants.ENEMY] = Blob.Blob(self.d[self.ENEMY_N] ,self.SIZE)
+        if (self.Blobs[MyConstants.FOOD] == None): self.Blobs[MyConstants.FOOD] = Blob.Blob(self.d[self.FOOD_N], self.SIZE)
+        self.Blobs[MyConstants.PLAYER].activate()
+        self.Blobs[MyConstants.ENEMY].activate()
+        self.Blobs[MyConstants.FOOD].activate()
+        self.Blobs[MyConstants.PLAYER].randomize_pos()
+        self.Blobs[MyConstants.ENEMY].randomize_pos()
+        self.Blobs[MyConstants.FOOD].randomize_pos()
+        while ( self.Blobs[MyConstants.PLAYER].get_pos() in self.obstacle_list or
+                self.Blobs[MyConstants.PLAYER].get_pos() in self.trap_list):
+            self.Blobs[MyConstants.PLAYER].randomize_pos()
+        while (self.Blobs[MyConstants.ENEMY].get_pos() in self.obstacle_list or
+                self.Blobs[MyConstants.ENEMY].get_pos() in self.trap_list):
+            self.Blobs[MyConstants.ENEMY].randomize_pos()
+        while (self.Blobs[MyConstants.FOOD].get_pos() in self.obstacle_list or
+                self.Blobs[MyConstants.FOOD].get_pos() in self.trap_list):
+            self.Blobs[MyConstants.FOOD].randomize_pos()
     
     def draw_message(self, image, location, my_msg, my_color):
         ImageDraw.Draw(
@@ -99,97 +119,111 @@ class MyGame():
         )
 
     def draw_score(self, image):
-        my_message = "PLAYER SCORE: " + str( self.player.score )
-        self.draw_message(image, (0,0),  my_message, self.player.color)
-        my_message = "ENEMY SCORE: " + str( self.enemy.score )
-        self.draw_message(image, (0,10),  my_message, self.enemy.color)
-        my_message = "FOOD SCORE: " + str( self.food.score )
-        self.draw_message(image, (0,20),  my_message, self.food.color)
+        my_message = "PLAYER SCORE: " + str( self.Blobs[MyConstants.PLAYER].score )
+        self.draw_message(image, (0,0),  my_message, self.Blobs[MyConstants.PLAYER].color)
+        my_message = "ENEMY SCORE: " + str( self.Blobs[MyConstants.ENEMY].score )
+        self.draw_message(image, (0,10),  my_message, self.Blobs[MyConstants.ENEMY].color)
+        my_message = "FOOD SCORE: " + str( self.Blobs[MyConstants.FOOD].score )
+        self.draw_message(image, (0,20),  my_message, self.Blobs[MyConstants.FOOD].color)
+        my_message = "EPISODE NO: " + str( self.episode_number )
+        self.draw_message(image, (0,30),  my_message, (255, 255, 255))
 
     def draw_game_state(self, image):
-        if self.game_state == self.STATE_ENEMY_WIN: my_color = self.enemy.color
-        elif self.game_state == self.STATE_FOOD_WIN: my_color = self.food.color
-        elif self.game_state == self.STATE_PLAYER_WIN: my_color = self.player.color
+        if self.game_state == self.STATE_ENEMY_WIN: my_color = self.Blobs[MyConstants.ENEMY].color
+        elif self.game_state == self.STATE_FOOD_WIN: my_color = self.Blobs[MyConstants.FOOD].color
+        elif self.game_state == self.STATE_PLAYER_WIN: my_color = self.Blobs[MyConstants.PLAYER].color
         else: my_color =  (255, 255, 255)
-        self.draw_message(image, (220, 0), self.game_state, my_color)
+        self.draw_message(image, (232, 0), self.game_state, my_color)
 
-    def render(self, W_WIDTH=300, W_HEIGHT=300, final_frame=False):
+    def render(self, W_WIDTH=300, W_HEIGHT=300, show = False, final_frame = False):
         img = Image.fromarray(self.environment, "RGB")
         img = img.resize((W_WIDTH, W_HEIGHT))
         self.draw_score(img)
         if final_frame: 
             self.draw_game_state(img)
         img = np.array(img)
-        cv2.imshow("Catch A Fly", img)
+        if show: 
+            cv2.imshow("Catch A Fly", img)
         return img
 
+    # update scores calls update environment implicitly
     def update_scores(self):
-        if self.player.get_pos() == self.food.get_pos(): 
-            self.player.score += 1
+        if self.Blobs[MyConstants.PLAYER].get_pos() == self.Blobs[MyConstants.FOOD].get_pos() and  self.Blobs[MyConstants.FOOD].is_active:
+            self.Blobs[MyConstants.FOOD].deactivate()
+            self.Blobs[MyConstants.PLAYER].score += 1
             self.game_state = self.STATE_PLAYER_WIN
-        elif self.enemy.get_pos() == self.player.get_pos(): 
-            self.enemy.score += 1
+            self.game_end_condition = True
+        elif self.Blobs[MyConstants.ENEMY].get_pos() == self.Blobs[MyConstants.PLAYER].get_pos() and self.Blobs[MyConstants.PLAYER].is_active:
+            self.Blobs[MyConstants.PLAYER].deactivate() 
+            self.Blobs[MyConstants.ENEMY].score += 1
             self.game_state = self.STATE_ENEMY_WIN
-        elif self.food.get_pos() == self.enemy.get_pos(): 
-            self.food.score += 1
+            self.game_end_condition = True
+        elif self.Blobs[MyConstants.FOOD].get_pos() == self.Blobs[MyConstants.ENEMY].get_pos() and self.Blobs[MyConstants.ENEMY].is_active:
+            self.Blobs[MyConstants.ENEMY].deactivate() 
+            self.Blobs[MyConstants.FOOD].score += 1
             self.game_state = self.STATE_FOOD_WIN
-        else: self.game_state = self.STATE_DRAW
-
-    def check_collisions(self, position):
-        # TODO: check collisions with enemy food obstacle and return state
-        if position in self.obstacle_list or position in self.trap_list:
-            return True
-        else:
-            return False
+            self.game_end_condition = True
+        self.update_environment()
+    
+    def check_traps(self, col_st, viewer):
+        if col_st[States.HIT_TRAP] == True:
+            self.Blobs[viewer].deactivate()
+            self.trap_counter += 1
+            if self.trap_counter >= 2:
+                self.game_end_condition = True
 
     # returns player collision state
-    def check_player_collisions(self, position):
-        player_col_st = {self.HIT_OBSTACLE: False, self.HIT_TRAP: False,
-                        self.HIT_ENEMY: False, self.HIT_FOOD: False}
+    def check_player_collisions(self, position, viewer):
+        col_st = {States.HIT_OBSTACLE: False, States.HIT_TRAP: False,
+                        States.HIT_ENEMY: False, States.HIT_FOOD: False}
         if position in self.obstacle_list:
-            player_col_st[self.HIT_OBSTACLE] = True
+            col_st[States.HIT_OBSTACLE] = True
         if position in self.trap_list:
-            player_col_st[self.HIT_TRAP] = True
-        if position == self.enemy.get_pos():
-            player_col_st[self.HIT_ENEMY] = True
-        if position == self.food.get_pos():
-            player_col_st[self.HIT_FOOD] = True
-        return player_col_st
+            col_st[States.HIT_TRAP] = True
+        if (viewer == MyConstants.PLAYER):
+            if position == self.Blobs[MyConstants.ENEMY].get_pos():
+                col_st[States.HIT_ENEMY] = True
+            if position == self.Blobs[MyConstants.FOOD].get_pos():
+                col_st[States.HIT_FOOD] = True
+        if (viewer == MyConstants.ENEMY):
+            if position == self.Blobs[MyConstants.FOOD].get_pos():
+                col_st[States.HIT_ENEMY] = True
+            if position ==self.Blobs[MyConstants.PLAYER].get_pos():
+                col_st[States.HIT_FOOD] = True
+        if (viewer == MyConstants.FOOD):
+            if position == self.Blobs[MyConstants.PLAYER].get_pos():
+                col_st[States.HIT_ENEMY] = True
+            if position ==self.Blobs[MyConstants.ENEMY].get_pos():
+                col_st[States.HIT_FOOD] = True
+        return col_st
 
     # every entity takes 1 step , 1  tick of this game
-    def env_step(self, player_action=False, enemy_action=False, food_action=False):
+    def env_step(self, action=False, viewer = MyConstants.PLAYER):
         # Prevent things from crossing over walls
-        if not player_action:
-            player_action = np.random.randint(0, 4)
-        player_col_st = self.check_player_collisions(
-            self.player.try_action(player_action))
+        if not action:
+            action = np.random.randint(0, 4)
+        player_col_st = self.check_player_collisions(self.Blobs[viewer].try_action(action), viewer)
         hit_obstacle = player_col_st['hit_obstacle']
         if not hit_obstacle:
-            self.player.action(player_action)
-        if not self.is_training:
-            if not enemy_action:
-                enemy_action = np.random.randint(0, 4)
-            if not self.check_collisions(self.enemy.try_action(enemy_action)):
-                self.enemy.action(enemy_action)
-
-            if not food_action:
-                food_action = np.random.randint(0, 4)
-            if not self.check_collisions(self.food.try_action(food_action)):
-                self.food.action(food_action)
+            self.Blobs[viewer].action(action)
         
-        self.update_environment()
-        self.update_scores()
-        return (self.get_obeservation(), player_col_st, self.game_end_condition())
+        # update scores calls update environment implicitly
+        self.check_traps(player_col_st, viewer)
+        self.update_scores() 
+        return (self.get_obeservation(viewer), player_col_st, self.game_end_condition)
 
-    def game_end_condition(self):
-        if self.game_state == self.STATE_DRAW: return False
-        else: return True
-    
     # format (player, enemy, food)
-    def get_obeservation(self, viewer="player"):
-        if viewer == "player":
-            return (self.player.get_pos(), self.enemy.get_pos(), self.food.get_pos())
-        if viewer == "enemy":
-            return (self.enemy.get_pos(), self.food.get_pos(), self.player.get_pos())
-        if viewer == "food":
-            return (self.food.get_pos(), self.player.get_pos(), self.enemy.get_pos())
+    def get_obeservation(self, viewer=MyConstants.PLAYER):
+        if viewer == MyConstants.PLAYER:
+            return (self.Blobs[MyConstants.PLAYER].get_pos(), self.Blobs[MyConstants.ENEMY].get_pos(), self.Blobs[MyConstants.FOOD].get_pos())
+        if viewer == MyConstants.ENEMY:
+            return (self.Blobs[MyConstants.ENEMY].get_pos(), self.Blobs[MyConstants.FOOD].get_pos(), self.Blobs[MyConstants.PLAYER].get_pos())
+        if viewer == MyConstants.FOOD:
+            return (self.Blobs[MyConstants.FOOD].get_pos(), self.Blobs[MyConstants.PLAYER].get_pos(), self.Blobs[MyConstants.ENEMY].get_pos())
+
+    def get_blobs(self):
+        return self.Blobs
+    
+    # returns number of blobs in trap
+    def get_trap_counter(self):
+        return self.trap_counter
